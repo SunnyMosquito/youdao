@@ -1,0 +1,12 @@
+Metadata-Version: 1.1
+Name: youdao
+Version: 0.0.1
+Summary: youdao translate
+Home-page: https://github.com/SunnyMosquito/youdao
+Author: zhiwen
+Author-email: 191329761@qq.com
+License: MIT
+Description: # youdao
+Platform: UNKNOWN
+Classifier: Topic :: Text Processing :: Indexing
+Classifier: Programming Language :: Python :: 3

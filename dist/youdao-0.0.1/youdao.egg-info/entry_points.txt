@@ -1,0 +1,3 @@
+[console_scripts]
+youdao = youdao.youdao:main
+

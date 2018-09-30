@@ -1,5 +1,4 @@
 README.md
-setup.cfg
 setup.py
 youdao/__init__.py
 youdao/search.png

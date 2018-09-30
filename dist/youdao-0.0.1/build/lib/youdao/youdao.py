@@ -7,16 +7,17 @@ import urllib
 import random
 import json
 
-from PyQt5.QtCore import pyqtSignal
-from PyQt5.QtCore import QCoreApplication
+from PyQt5.QtCore import QCoreApplication, Qt
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (QApplication, QPlainTextEdit, QDesktopWidget, QTextEdit, QGridLayout, QPushButton, QMessageBox,
                              QLabel, QMainWindow, QVBoxLayout, QWidget, QSystemTrayIcon, QMenu, QAction, QDialog)
 
 
-appKey = '2634c6f9069d9715'
-secretKey = 'K3hbukgfqM7E16SqqQf8TIT08zeWQd3e'
+appKey = '2634c6f9069d9715'  # 网易云翻译api
+secretKey = 'K3hbukgfqM7E16SqqQf8TIT08zeWQd3e'  # 请不要乱用
 baseDir = os.path.dirname(__file__)
+dictFileName = os.path.join(baseDir, 'OxfordEnDict.txt')
+
 
 def translate(q='good', fromLang='auto', toLang='auto'):
     httpClient = None
@@ -32,7 +33,6 @@ def translate(q='good', fromLang='auto', toLang='auto'):
     try:
         httpClient = http.client.HTTPConnection('openapi.youdao.com')
         httpClient.request('GET', myurl)
-
         # response是HTTPResponse对象
         response = httpClient.getresponse()
         data = json.loads(response.read().decode('utf-8'))
@@ -40,9 +40,20 @@ def translate(q='good', fromLang='auto', toLang='auto'):
 
     except Exception as e:
         print(e)
+
     finally:
         if httpClient:
             httpClient.close()
+
+
+def localtran(q='good', fromLang='auto', toLang='auto'):
+    with open(dictFileName) as file:
+        for line in file:
+            if line:
+                li = line.split()
+                if li[0] == q:
+                    return li[0], li[1]
+    return None, None
 
 
 class YouDao(QMainWindow):
@@ -68,59 +79,85 @@ class YouDao(QMainWindow):
         self.textEdit.clear()
         self.preview.clear()
 
+    def keyPressEvent(self, event):
+
+        if event.key() == Qt.Key_Return:
+            self.confirmClicked()
+        else:
+            super(YouDao, self).keyPressEvent(event)
+
     def confirmClicked(self):
         q = self.textEdit.toPlainText()
+        # 要翻译的内容为空
         if not q.strip():
             alert = QMessageBox(self)
             alert.setText("你什么也没有输入！！！")
             alert.exec()
             return
         data = translate(q)
+        # 没有数据就用本地词典
+        if not data:
+            key, value = localtran(q)
+            if key and value:
+                self.preview.setHtml('<i>翻译：</i>{}'.format(value))
+            else:
+                alert = QMessageBox(self)
+                alert.setText("出错了")
+                alert.exec()
+            return
+
         usPhonetic = ''
-        ukPhonetic = None
+        ukPhonetic = ''
+        translation = ''
+        web = ''
 
         html = '''
                    <html>
                         <head></head>
                         <body>
-                            <p>{explains}</p>
+                            <p>{translation}</p>
                             {uk-phonetic}
                             {us-phonetic}
-                            <p>{web}</p>
+                            {web}
                         </body>
                    </html>
                '''
+        if data.get('translation'):
+            translation = '<i>翻译：</i>' + \
+                ''.join(data.get('translation')) + '<br>'
+
         if data.get('basic'):
-            translation = '<br>'.join(data.get('basic').get('explains'))
-            usPhonetic = '<h6>英音：<span>[{}]</span></h6>'.format(
-                data.get('basic').get('us-phonetic'))
-            ukPhonetic = '<h6>美音：<span>[{}]</span></h6>'.format(
-                data.get('basic').get('uk-phonetic'))
-        else:
-            translation = ''.join(data.get('translation'))
-        web = ''
+            translation += '<br>'.join(data.get('basic').get('explains'))
+            if data.get('basic').get('us-phonetic'):
+                usPhonetic = '<h6>英音：<span>[{}]</span></h6>'.format(
+                    data.get('basic').get('us-phonetic'))
+            if data.get('basic').get('uk-phonetic'):
+                ukPhonetic = '<h6>美音：<span>[{}]</span></h6>'.format(
+                    data.get('basic').get('uk-phonetic'))
+
         if data.get('web'):
-            web = ','.join(','.join(value.get('value'))
-                           for value in data.get('web'))
+            web = '网络释义：' + '<br>'.join(','.join(value.get('value'))
+                                        for value in data.get('web'))
+
         values = {
-            'explains': translation,
+            'translation': translation,
             'us-phonetic': usPhonetic,
             'uk-phonetic': ukPhonetic,
             'web': web
         }
+
         self.preview.setHtml(html.format(**values))
 
     def initUI(self):
         # 系统托盘
         self.trayIcon = QSystemTrayIcon(self)
-        self.trayIcon.setIcon(QIcon(os.path.join(baseDir,"youdao.png")))
+        self.trayIcon.setIcon(QIcon(os.path.join(baseDir, "youdao.png")))
 
-        self.openAction = QAction(QIcon(os.path.join(baseDir,"search.png")), "查单词", self)
-        print(os.getcwd())
-        print(os.path.dirname(__file__))
-        print(os.path.abspath(__file__))
+        self.openAction = QAction(
+            QIcon(os.path.join(baseDir, "search.png")), "查单词", self)
         self.openAction.triggered.connect(self.open)
-        self.settingAction = QAction(QIcon(os.path.join(baseDir,"setting.png")), "设置", self)
+        self.settingAction = QAction(
+            QIcon(os.path.join(baseDir, "setting.png")), "设置", self)
         self.quitAction = QAction("退出", self)
         self.quitAction.triggered.connect(QCoreApplication.quit)
         self.qMenu = QMenu(self)
@@ -140,6 +177,16 @@ class YouDao(QMainWindow):
         self.textEdit.setPlaceholderText('请输入')
         self.textEdit.setStyleSheet(
             "QWidget{font-size: 18px;background: #f2f2f2}")
+
+        def enterKeyPressEvent(event):
+
+            if event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
+                self.confirmClicked()
+            else:
+                QPlainTextEdit.keyPressEvent(self.textEdit, event)
+        # 重写QPlainTextEdit的enter事件，enter确认
+        self.textEdit.keyPressEvent = enterKeyPressEvent
+
         self.clearText = QPushButton("清除")
         self.clearText.setStyleSheet("QPushButton{background: #ffffff;}")
         self.clearText.clicked.connect(self.clearTextClicked)
@@ -159,7 +206,7 @@ class YouDao(QMainWindow):
 
         self.preview = QTextEdit()
         self.preview.setReadOnly(True)
-        self.preview.setText("这里什么都没有。。。")
+        self.preview.setPlaceholderText('这里什么都没有。。。')
 
         self.hbox = QVBoxLayout(self.centralWidget)
         self.hbox.setContentsMargins(6, 6, 6, 6)
@@ -172,10 +219,11 @@ class YouDao(QMainWindow):
 
         self.setCentralWidget(self.centralWidget)
         self.setWindowTitle('有道词典')
-        self.setWindowIcon(QIcon(os.path.join(baseDir,'youdao.png')))
+        self.setWindowIcon(QIcon(os.path.join(baseDir, 'youdao.png')))
 
         self.setFixedSize(350, 400)
         self.center()
+        # self.setFocusPolicy(Qt.StrongFocus)
         self.show()
         self.trayIcon.show()
 

@@ -12,7 +12,6 @@ setup(
     url="https://github.com/SunnyMosquito/youdao",
     packages=['youdao'],
     data_files=[('youdao',['youdao/search.png','youdao/setting.png','youdao/youdao.png'])],
-    # package_data={'package': ['search.png', 'setting.png', 'youdao.png']},
     install_requires=[
         "PyQt5",
     ],
